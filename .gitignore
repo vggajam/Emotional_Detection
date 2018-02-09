@@ -4,3 +4,5 @@ archieve
 desktop.ini
 logs
 twitter_db
+secrets.json
+op.*

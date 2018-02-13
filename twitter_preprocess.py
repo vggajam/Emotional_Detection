@@ -9,10 +9,37 @@ import numpy as np
 import spacy
 from nltk.tokenize import TweetTokenizer
 from textblob import TextBlob
+import datetime as dt
 
+TF = "%a %b %d %H:%M:%S %z %Y"
 EMOJI_POL = json.load(open('./emoji_pol.json'))
-
 NLP = spacy.load('en')
+PP = ['i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them']
+WORD_CATS = NLP('home work money religion death health food friend family')
+SIMI_THRESHOLD = 0.5
+
+def weekno(tweet_time):
+    tt = dt.datetime.strptime(tweet_time,TF)
+    return(str(tt.isocalendar()[0])+'_'+str(tt.isocalendar()[1]))
+
+def wordcat(tokens = None, text = ''):
+    res = np.zeros(10)
+    print(tokens)
+    if tokens is None:
+        tokens = NLP(text)
+    for token in tokens:
+        if not token.is_stop:
+            if token.text in PP:
+                res[0] = res[0] +1
+            else:
+                sim_list = np.zeros(9)
+                for i in range(len(WORD_CATS)):
+                    sim_list[i] = token.similarity(WORD_CATS[i])
+                print(sim_list)
+                idx = np.argmax(sim_list)
+                print(token, WORD_CATS[idx].text, sim_list[idx])
+                res[idx+1] = res[idx+1] +1
+    return res
 
 def degree(text):
     """
@@ -31,11 +58,10 @@ def degree(text):
             return i+1
     return 0
 
-def adv_attr(text):
+def adv_attr(tokens, text):
     tweet_degree = degree(text)
     adv_tot = 0
     adj_cnt = 0
-    tokens = NLP(text)
     for token in tokens:
         if token.dep_ == 'advmod':
             adv_tot = adv_tot+1
@@ -46,6 +72,7 @@ def adv_attr(text):
         return [(tweet_degree*adj_cnt)/adv_tot, adj_cnt]
     else:
         return [0, 0]
+
 def atostr(arr):
     """
         converts 1-d array to string for using as key
@@ -87,33 +114,34 @@ def ling_features(text):
     """
     containsText = False
     attr = np.zeros(10)
+    tokens = NLP(text)
     # linguistic feature extraction
-    for token in TweetTokenizer().tokenize(text):
-        # print(token)
-        if token.startswith('https://') or token.startswith('http://'):
+    for token in tokens:
+        # print(token, token.pos_)
+        if token.text.startswith('https://') or token.text.startswith('http://'):
             continue
         containsText = True
-        if token in EMOJI_POL.keys():
-            if EMOJI_POL[token] > 0:
+        if token.text in EMOJI_POL.keys():
+            if EMOJI_POL[token.text] > 0:
                 attr[2] = attr[2]+1
-            elif EMOJI_POL[token] < 0:
+            elif EMOJI_POL[token.text] < 0:
                 attr[3] = attr[3]+1
-        elif token == '!':
+        elif token.text == '!':
             attr[4] = attr[4]+1
-        elif token == '?':
+        elif token.text == '?':
             attr[5] = attr[5]+1
-        elif token == '...':
+        elif token.text == '...':
             attr[6] = attr[6]+1
-        elif token == '.':
+        elif token.text == '.':
             attr[7] = attr[7]+1
         else:
-            blob = TextBlob(token)
+            blob = TextBlob(token.text)
             if blob.polarity > 0:
                 attr[0] = attr[0]+1
             elif blob.polarity < 0:
                 attr[1] = attr[1]+1
-    attr[8:10] = adv_attr(text)
     if containsText:
+        attr[8:10] = adv_attr(tokens, text)
         return list(attr)
     else:
         return None
@@ -184,44 +212,65 @@ def behave_features(tweet):
     """
     attr = np.zeros(41)
     attr[0] = len(tweet['entities']['user_mentions'])
-    attr[1] = 'retweeted_status' in tweet.keys()
+    attr[1] = int('retweeted_status' in tweet.keys())
     attr[2] = int(tweet['in_reply_to_status_id'] != None)
 
-    attr[3+int(tweet['created_at'][11:11+2])] = 1
+    time = dt.datetime.strptime(tweet['created_at'], TF) + dt.timedelta(seconds=int(tweet['user']['utc_offset']))
+    attr[3+int(time.hour)] = 1
 
-    attr[27] = len(tweet['entities']['media']) >= 1
+    try:
+        attr[27] = int(tweet['entities']['media'][0]['type']=='photo')
+    except KeyError:
+        attr[27] = 0
     attr[28] = 'retweeted_status' not in tweet.keys() and tweet['in_reply_to_status_id'] is None
     attr[29] = '?' in tweet['text']
-    attr[30] = 'urls' in tweet['entities'] and len(tweet['entities']['urls']) >= 1
+    try:
+        attr[30] = int(len(tweet['entities']['urls']) >= 1)
+    except:
+        attr[30] = 0
 
     return list(attr)
 
 def sintrxn_features(tweet):
     """social interaction attributes
-        0
-        1
-        2
-        3
-        4
-        5
-        6
-        7
-        8
-        9
+        content style:
+            0 -> personal pronouns
+            1 -> home
+            2 -> work
+            3 -> money
+            4 -> religion
+            5 -> death
+            6 -> health
+            7 -> ingestion
+            8 -> friends
+            9 -> family
 
-        10 -> positive emojis
-        11 -> negative emojis
+            10 -> positive emojis
+            11 -> negative emojis
 
-        12 -> stressed neighbors
-        13 -> strong tie stressed neighbors
-        14 -> weak --do--
-        15 -> followers
-        16 -> fans
-        17-25 -> social structure
+        sociallization:
+            dictionary with key,value pairs
+                where key is user,
+                    value is interaction count
     """
-    attr = np.zeros(25)
+    attr = np.zeros(12)
+    social = dict()
+    tokens = NLP(tweet['text'])
+    attr[:10] = wordcat(tokens)
 
-    return list(attr)
+    for token in tokens:
+        if token in EMOJI_POL:
+            if EMOJI_POL[token.text] > 0:
+                attr[10] = attr[10] +1
+            elif EMOJI_POL[token.text] < 0:
+                attr[11] = attr[11] +1
+    pol = int(TextBlob(tweet['text']).polarity>0)
+    for mention in tweet['entities']['user_mentions']:
+        if mention['screen_name'] not in social:
+            social[mention['screen_name']]=[0,0]
+        social[mention['screen_name']][pol] = social[mention['screen_name']][pol]+1
+
+    return list(attr), social
 
 def satnxn_features(tweet):
     """------------------ social ---------------------
@@ -256,10 +305,69 @@ def all_features_by_tweet(tweet_id='958527757063000065', twitter_db='./twitter_d
     try:
         if tweet['extended_entities']['media'][0]['type'] == 'photo':
             features_pkt['vis'] = vis_features(twitter_db+urlparse(tweet['extended_entities']['media'][0]['media_url']).path)
+        else:
+            features_pkt['vis'] = None
     except KeyError:
         features_pkt['vis'] = None
 
     features_pkt['satnxn'] = satnxn_features(tweet)
-    # features_pkt['behave'] = behave_features(tweet)
-    # features_pkt['sintrxn'] = sintrxn_features(tweet)
+    features_pkt['behave'] = behave_features(tweet)
+    features_pkt['cstyle'], features_pkt['social'] = sintrxn_features(tweet)
     return features_pkt
+
+def user_features(user = 'venugopalgajam', db_loc='./twitter_db/by_user/', save_to_files = True):
+    try:
+        metadata =  json.load(open(db_loc+str(user)+'/metadata.json'))
+    except FileNotFoundError:
+        print('metadata file missing!!')
+        return
+    print(metadata)
+    tweet_attrs = dict()
+    user_attrs = dict()
+    social_attrs = dict()
+    for tweet_id in metadata:
+        # tweet = json.load(open(db_loc+'/tweets/'+str(tweet_id)+".json"))        
+        features = all_features_by_tweet(str(tweet_id),db_loc+'/'+str(user)+'/')
+        week = weekno(features['time'])
+        tweet_attrs_row = list()
+        
+        if features['ling'] is None:
+            tweet_attrs_row = [0.0]*10
+        else:
+            tweet_attrs_row = features['ling']
+        
+        if features['vis'] is None:
+            tweet_attrs_row =  tweet_attrs_row + [0.0]*21
+        else:
+            tweet_attrs_row = tweet_attrs_row + features['vis']
+
+        if features['satnxn'] is None:
+            tweet_attrs_row = [0.0]*3
+        else:
+            tweet_attrs_row = tweet_attrs_row + features['satnxn']
+
+        if week not in tweet_attrs:
+            tweet_attrs[week] =list()
+        tweet_attrs[week].append([str(tweet_id)]+tweet_attrs_row)
+
+        user_attrs_row = features['behave']+features['cstyle']
+        if week not in user_attrs:
+            user_attrs[week] = user_attrs_row
+        else:
+            for i in range(len(user_attrs[week])):
+                  user_attrs[week][i] = user_attrs[week][i] + user_attrs_row[i]
+    
+        if week not in social_attrs:
+            social_attrs[week]=features['social']
+        else:
+            for key in features['social']:
+                if key in social_attrs[week]:
+                    social_attrs[week][key] = np.add(social_attrs[week][key], features['social'][key]).tolist()
+                else:
+                    social_attrs[week][key] = features['social'][key]
+    
+    if save_to_files:
+        json.dump(tweet_attrs, open(db_loc+'/'+str(user)+'/tweet_attrs.json','w',encoding='utf-8'))
+        json.dump(user_attrs, open(db_loc+'/'+str(user)+'/user_attrs.json','w',encoding='utf-8'))
+        json.dump(social_attrs, open(db_loc+'/'+str(user)+'/social_attrs.json','w',encoding='utf-8'))
+    return tweet_attrs, user_attrs, social_attrs

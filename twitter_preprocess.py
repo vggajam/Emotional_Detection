@@ -1,6 +1,7 @@
 """
     twitter preprocess tools
 """
+import datetime as dt
 import json
 from urllib.parse import urlparse
 
@@ -9,7 +10,6 @@ import numpy as np
 import spacy
 from nltk.tokenize import TweetTokenizer
 from textblob import TextBlob
-import datetime as dt
 
 TF = "%a %b %d %H:%M:%S %z %Y"
 EMOJI_POL = json.load(open('./emoji_pol.json'))

@@ -1,7 +1,8 @@
 import re
 import json
+REGEX_FILE = "./utils/regex_list.json"
 class word_counter:
-    def __init__(self,regex_dict="./regex_list.json"):
+    def __init__(self,regex_dict=REGEX_FILE):
         self.regex_list = dict()
         if type(regex_dict) == type(str()):
             regex_dict = json.load(open(regex_dict))

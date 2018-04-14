@@ -10,7 +10,6 @@ project_envi
 archieve
 twitter_webpages
 *.json
-*.txt
 *.log
 *.ini
 Report

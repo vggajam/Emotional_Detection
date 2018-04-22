@@ -3,7 +3,7 @@ id_str varchar(22) NOT NULL,
 user_id	varchar(51) DEFAULT NULL,
 tdate date DEFAULT NULL,
 ttime time DEFAULT NULL,
-text varchar(-1) DEFAULT NULL,
+text varchar(1000) DEFAULT NULL,
 reply_to varchar(22) DEFAULT NULL,
 containsText double DEFAULT NULL,
 deg_adv double DEFAULT NULL,
@@ -153,6 +153,5 @@ posemoji double DEFAULT NULL,
 negemoji double DEFAULT NULL,
 neuemoji double DEFAULT NULL,
   PRIMARY KEY (`id_str`),
-  UNIQUE KEY `id_str_UNIQUE` (`id_str`),
-  KEY `place` (`place`)
+  UNIQUE KEY `id_str_UNIQUE` (`id_str`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8

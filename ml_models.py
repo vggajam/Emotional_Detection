@@ -1,6 +1,7 @@
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.multiclass import OneVsRestClassifier
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score,train_test_split
+from sklearn.metrics import confusion_matrix
 import datetime as dt
 import numpy as np
 import joblib
@@ -77,24 +78,26 @@ def make_knn(train_data_x, train_data_y, save_to=None, cross_val=5):
         joblib.dump(model,save_to)
     return model, scores
 
-def make_dnn(train_data_x, train_data_y, save_to=None, cross_val=5):
+def make_dnn(train_data_x, train_data_y, hidden_layers=1, save_to=None, cross_val=5):
     print('data shape:',np.shape(train_data_x),np.shape(train_data_y))
     assert np.shape(train_data_x)[0] == np.shape(train_data_y)[0]
-    mlpmodel = MLPClassifier(hidden_layer_sizes=(np.shape(train_data_x)[1],),activation='logistic',solver='sgd',max_iter=10000)
+    mlpmodel = MLPClassifier(hidden_layer_sizes=hidden_layers*(np.shape(train_data_x)[1]+1,),activation='logistic',solver='sgd',max_iter=10000)
     model = OneVsRestClassifier(mlpmodel)
     if cross_val > 0 and cross_val <=10:
         scores = cross_val_score(model, train_data_x, train_data_y, cv=cross_val)
         print('scores:',scores)
         print('mean score:',np.mean(scores))
-        # model.fit(train_data_x[:int(len(train_data_x)*7/10)],train_data_y[:int(len(train_data_x)*7/10)])
-        # for mod in model.estimators_:
-        #     print('training info:',mod.n_iter_,mod.loss_)
-        # print('accuracy:',model.score(np.array(train_data_x[int(len(train_data_x)*7/10):]),np.array(train_data_y[int(len(train_data_x)*7/10):])))
+    
+    # X_train, X_test, y_train, y_test = train_test_split(train_data_x, train_data_y, random_state=0)
     model.fit(train_data_x,train_data_y)
+    data_y_pred = model.predict(train_data_x)
+    cm = confusion_matrix(train_data_y,data_y_pred,[1,-1,0])
     if save_to is not None:
         joblib.dump(model,save_to)
-    return model, scores
+    return model, scores, cm
+
 def make_svm(train_data_x, train_data_y, save_to = None, cross_val=5):
+    # data_shape = np.shape(train_data_x)
     print('data shape:',np.shape(train_data_x),np.shape(train_data_y))
     assert np.shape(train_data_x)[0] == np.shape(train_data_y)[0]
     mlpmodel = svm.SVC()
@@ -103,14 +106,13 @@ def make_svm(train_data_x, train_data_y, save_to = None, cross_val=5):
         scores = cross_val_score(model, train_data_x, train_data_y, cv=cross_val)
         print('scores:',scores)
         print('mean score:',np.mean(scores))
-        # model.fit(train_data_x[:int(len(train_data_x)*7/10)],train_data_y[:int(len(train_data_x)*7/10)])
-        # for mod in model.estimators_:
-        #     print('training info:',mod.n_iter_,mod.loss_)
-        # print('accuracy:',model.score(np.array(train_data_x[int(len(train_data_x)*7/10):]),np.array(train_data_y[int(len(train_data_x)*7/10):])))
     model.fit(train_data_x,train_data_y)
+    data_y_pred = model.predict(train_data_x)
+    cm = confusion_matrix(train_data_y,data_y_pred,[1,-1,0])
+    
     if save_to is not None:
         joblib.dump(model,save_to)
-    return model, scores
+    return model, scores, cm
 
 def make_lr(train_data_x, train_data_y, save_to = None, cross_val=5):
     print('data shape:',np.shape(train_data_x),np.shape(train_data_y))

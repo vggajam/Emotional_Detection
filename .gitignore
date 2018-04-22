@@ -12,4 +12,5 @@ twitter_webpages
 *.json
 *.log
 *.ini
+*.csv
 Report

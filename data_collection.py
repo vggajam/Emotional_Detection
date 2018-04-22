@@ -134,7 +134,7 @@ def init_api (creds_path=CREDS_FILE, app_only=True):
     
 def save_tweet(tweet, loc, metadata, log_fd=None):
     """
-        saves the tweet with given label at loc
+        saves the tweet at loc
     """
     if 'possibly_sensitive' in tweet.keys() and tweet['possibly_sensitive']:
         return False
@@ -213,29 +213,31 @@ def by_tweet(tweet_id, label, api, loc='./twitter_db/by_tweet/'):
             json.dump(metadata, open(loc+'metadata.json', mode='w'))
             log_fd.write('updated metadata\n')
 
-def by_user(user, api, since_id,max_id,db_loc,tweets_cnt=20000):
+def by_user(user, api, since_id,max_id,db_loc):
     """
-        collects tweets by user
+    	Collects tweets of a "user" from "since_id" to "max_id" and
+    	stores in "db_loc" in an organized structure
+		api is an object that takes care of authentication to twitter APIs
     """
     loc = db_loc+user+'/' 
     mk_db_dir(loc)
     metadata = json.load(open(loc+'metadata.json'))
-    counter = TWEETS_BATCH_SIZE
-    gc.enable()
-    tweet_cnt =0
-    with open('./logs/by_user '+str(datetime.now()).replace(':','-')+'.log', 'w') as log_fd:
+    counter = TWEETS_BATCH_SIZE # setting counter to TWEETS_BATCH_SIZE
+    gc.enable() # enabling garbage collection
+    tweet_cnt =0 # no of tweets collected
+    with open('./logs/by_user '+str(datetime.now()).replace(':','-')+'.log', 'w') as log_fd: # log file
         log_fd.write(user+' '+since_id+' '+max_id+' '+loc+'\n')
         try:
-            for tweet in tweepy.Cursor(api.user_timeline, id=user, since_id=since_id, max_id=max_id).items(tweets_cnt):
+            for tweet in tweepy.Cursor(api.user_timeline, id=user, since_id=since_id, max_id=max_id).items():
                 print(tweet._json['id_str']);log_fd.write(tweet._json['id_str']+'\n')
                 if tweet._json['id_str'] not in metadata.keys():
-                    save_tweet(tweet._json, loc, metadata, log_fd)
+                    save_tweet(tweet._json, loc, metadata, log_fd) # saves the tweet json object at "loc"
                     tweet_cnt +=1
                     counter -=1
                     if counter == 0:
                         counter = TWEETS_BATCH_SIZE
-                        json.dump(metadata, open(loc+'metadata.json', mode='w'))
-                        gc.collect()
+                        json.dump(metadata, open(loc+'metadata.json', mode='w')) # saving the metadata for RAM optimal utilization
+                        gc.collect() # garbage collection is done here
                         print('saved!!');log_fd.write('saved!!\n')
         except Exception as err:
             print(err);log_fd.write(str(err)+'\n')
@@ -243,6 +245,8 @@ def by_user(user, api, since_id,max_id,db_loc,tweets_cnt=20000):
             json.dump(metadata, open(loc+'metadata.json', mode='w'))
             print('updated metadata');log_fd.write('updated metadata\n')
     print(str(tweet_cnt)+" are collected from "+str(user))
+
+
 def by_query(qry, label, cnt, api, loc='./twitter_db/by_query/'):
     """
         search twitter
